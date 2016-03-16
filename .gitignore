@@ -1,9 +1,17 @@
 # History files
 .Rhistory
+<<<<<<< HEAD
+=======
+.Rapp.history
+
+# Session Data files
+.RData
+>>>>>>> d9724ee68fd73e1c51b2a243314cbc5e5fe856ab
 
 # Example code in package build process
 *-Ex.R
 
+<<<<<<< HEAD
 # R data files from past sessions
 .Rdata
 .Rproj.user
@@ -11,3 +19,14 @@
 ## knitr
 *.html
 *.md
+=======
+# RStudio files
+.Rproj.user/
+
+# produced vignettes
+vignettes/*.html
+vignettes/*.pdf
+
+# OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
+.httr-oauth
+>>>>>>> d9724ee68fd73e1c51b2a243314cbc5e5fe856ab

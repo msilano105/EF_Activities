@@ -5,6 +5,8 @@ date: "February 15, 2016"
 output: html_document
 ---
 
+
+
 ```{r,echo=FALSE}
 require(rjags)
 require(coda)
@@ -26,8 +28,6 @@ JAGS itself provides a reference manual that is useful for looking up the syntax
 There’s a large amount of info in both the JAGS and BUGS manuals but I wanted to point out a few sections that you’ll find yourself coming back to repeatedly. One of these topics is the BUGS “Model Specification” which provides a lot of detail on how to write models in BUGS/JAGS, how data must be formatted, and the list of functions and distributions that BUGS/JAGS knows about. The naming convention for distributions in BUGS/JAGS is very similar to the convention in R, but there are a few cases where the parameterization is different (e.g. Weibull) so it is always good to check that the values you are passing to a BUGS/JAGS distribution are what you think they are. One very important example of this is that the Normal distribution in BUGS/JAGS, dnorm, is parameterized in terms of a mean and precision (1/variance) rather than a mean and standard deviation, which is the parameterization in R. To make life even more complicated, there are a small number of places where the JAGS syntax is slightly different from the BUGS version, so it's best to check the JAGS manual specifically for the definitions of any distributions and functions.
 
 Within the BUGS Examples page you'll find three volumes of examples that provided written explanations of analyses with the BUGS code. Working through these is a great way to learn more about how BUGS works. When you first start analyzing your own data it is often easiest to start from an existing example and modify it to meet your needs rather than starting from scratch.
-
-
 
 
 # A Simple JAGS model
@@ -54,21 +54,27 @@ model {
 }
 ```
 When writing models in JAGS we have to specify the data model, process model, and parameter model using the second (tilda) notation. However, we don't need to specify explicitly the connections between them—JAGS figures them out based on the conditional probabilities involved. Deterministic calculations (e.g. process model) always make use of an arrow ( <- ) for assignment (similar to R syntax we’ve mentioned before). Assignment of random variables is always done with a tilde (~). **The equal sign ( = ) cannot be used for either process or data models. Furthermore, deterministic calculations and distributions can not be combined in the same line of code.** For example, a regression model where we're trying to predict data y based on observation x might include
+
 ```
 mu <- b0 + b1* x # process model 
 y ~ dnorm(mu,tau) # data model
 ```
+
 but in JAGS the same model can NOT be expressed as
+
 ```
 y ~ dnorm(b0 + b1* x, tau)
 ```
+
 Putting this all together, to specify our first model of a normal likelihood and normal prior, the JAGS code is:
+
 ```
 model {
 mu ~ dnorm(mu0,T) # prior on the mean 
 X ~ dnorm(mu,S) # data model
 }
 ```
+
 The first line of this model specifies the prior and says that “mu” is a random variable (~) that is Normally distributed (dnorm) with an expected value of "mu0" and a precision of T. The second line specifies the likelihood and says that there is a single data point “X” that is a random variable that has a Normal distribution with expected value “mu” and precision “S”.
 
 Hopefully the above JAGS code seems pretty clear. However there are a few quirks to how JAGS evaluates a model, some of which are just ideosynchacies (like no =) while others are deeply embedded in the logic but often misleading to newcomers. One of the more disorienting is that because JAGS isn't evaluating the code sequentially the order of the code doesn't matter -- the above model is equivalent to
@@ -279,28 +285,143 @@ The data for fiting this model are
 ```{r}
 data = list(N = 297, mu0=20, T=0.01, S = 1/27, X = c(20.9, 13.6, 15.7, 6.3, 2.7, 25.6, 4, 20.9, 7.8, 27.1, 25.2, 19, 17.8, 22.8, 12.5, 21.1, 22, 22.4, 5.1, 16, 20.7, 15.7, 5.5, 18.9, 22.9, 15.5, 18.6, 19.3, 14.2, 12.3, 11.8, 26.8, 17, 5.7, 12, 19.8, 19, 23.6, 19.9, 8.4, 22, 18.1, 21.6, 17, 12.4, 2.9, 22.6, 20.8, 18.2, 14.2, 17.3, 14.5, 8.6, 9.1, 2.6, 19.8, 20, 22.2, 10.2, 12.9, 20.9, 21.1, 7.3, 5.8, 23.1, 17, 21.5, 10.1, 18.4, 22.6, 21.2, 21.5, 22.4, 17.3, 16, 25, 22.4, 23.9, 23, 21.9, 19, 28.6, 16, 22.5, 23.2, 8.7, 23.4, 15.3, 25.6, 19.2, 17.4, 23.8, 20.4, 19, 3.6, 23.4, 19.6, 17.5, 16.5, 22, 19.7, 7.35, 18, 17.8, 9.6, 15, 12, 17.7, 21.4, 17, 22.1, 18.9, 15.05, 12.9, 19.3, 15.3, 13.6, 15.4, 10.6, 11.3, 11.8, 22.2, 22.2, 13.1, 7.4, 4.5, 11.7, 19.5, 19.9, 11.6, 13.9, 15.5, 11, 18.6, 17.6, 12.7, 20.9, 18.8, 22.4, 21.2, 18.2, 15.3, 13.6, 7.3, 17.4, 17.4, 10.5, 22.9, 23.2, 13.8, 14.8, 22.2, 20.9, 13, 18.9, 19, 15.2, 16.8, 18, 24.6, 15.4, 17.2, 23.2, 22.8, 25.5, 7.8, 6, 6.4, 19, 13.5, 23.7, 18, 22.2, 22.4, 9.3, 13.7, 18.9, 20.5, 23.3, 20.8, 18.4, 4.5, 12.2, 16.9, 13.5, 17.8, 16.9, 20.4, 19.5, 22.2, 24.5, 21.2, 16.5, 18, 16.4, 3.9, 17.9, 22, 12.9, 21, 18, 9.2, 15.9, 8.1, 8.3, 10.7, 12, 19.9, 13.6, 17.3, 11.5, 12.4, 15.1, 22, 19.3, 17.5, 14.5, 14.7, 17.5, 19.6, 12.9, 20.3, 17.9, 20.2, 18.3, 9.5, 19, 21, 13.1, 20.4, 16.3, 18.3, 11.8, 23.3, 15.2, 20, 17.9, 12, 19.6, 18.5, 16.2, 10.9, 17.8, 13.8, 10, 17.9, 15.6, 20.3, 14.9, 18.6, 12.5, 18.2, 16, 18.7, 18, 15.3, 19, 17.9, 15.8, 17.7, 14.4, 19.6, 18.3, 18.7, 17.8, 18, 10.1, 18.8, 16.4, 21.2, 16.6, 16.7, 17.8, 16.5, 19.3, 16.3, 14.2, 13, 9.4, 19.7, 13.4, 2.6, 17.6, 16.7, 17.6, 5.8, 17.6, 20.1, 18.2, 16.7, 14, 13.9, 5.1, 16.6, 3.9, 17.5, 18))
 ```
-
 Data for this analysis is presented in JAGS list format below. Copy and paste the text into your script:
+
+
+------------------------
+Sadly the jags.model function refuses to be recognized.  Even in the actual assignment the function does not work.  Because of this I am incapable of creating a working RMD with the needed variables and equations but I typed the code as comments or just text, so at least a knitting file could be submitted. Sorry in advance!
+------------------------
 
 ### Activity Task 1
 Run the unknown mean/fixed variance model to estimate mean tree diameter. Include the following in your report:
+```{r}
+
+NormalMeanN <- "
+model {
+  mu ~ dnorm(mu0,T) # prior on the mean 
+  SD ~ dchisq(.95, N-1, ncp = 0, log = FALSE)
+  P <- 1/(SD^2)
+  for(i in 1:N){
+    X[i] ~ dnorm(mu,S) # data model
+  }
+}"
+
+```
 
 * Table of summary statistics for the posterior estimate of the mean
+```{r}
+inits <- list()
+inits[[1]] <- list(mu = 7)
+inits[[2]] <- list(mu = 15)
+inits[[3]] <- list(mu = 21)
+```
+
+```{r}
+MY.model   <- jags.model (file = textConnection(NormalMeanN),
+                             data = data,
+                             inits = inits,
+                             n.chains = 3)
+```
+
+```{r}
+MY.out   <- coda.samples (model = MY.model,
+                            variable.names = c("mu"),
+                                n.iter = 1000) 
+
+```
+
+```{r}
+burnin <- GBR$last.iter[tail(which(GBR$shrink[,,2] > 1.1),1)+1]
+
+if(length(burnin) == 0) burnin = 1
+
+jags.burn <- window(jags.out,start=burnin)
+```
+
 * Graph of parameter density
+```{r}
+plot(MY.out)
+```
+
 * Plot of MCMC “history”
+```{r}
+BBR <- gelman.plot(MY.out)
+```
+
 * Length of your MCMC (i.e. the total number of “updates”), the number of chains, the burnin values you used, the effective sample size, and any graphs/statistics/rationale you used to justify those settings
+```{r}
+effectiveSize(jags.burn)
+burnin 
+# MCM length = 1000
+# Chains = 3
+```
+
+
 
 ### Activity Task 2
 Modify the model to account for the uncertainty in the variance. This only requires adding one line — a prior on S outside the loop.
-
 Run the unknown mean/unknown variance model to simultaneously estimate both the mean tree diameter and the standard deviation. Include in your report the following:
 
 * Explaination of your choice of prior on the precision
-* Table of summary statistics for the posterior mean and standard deviation
-* Graph of parameter densities
-* Plot of MCMC “history”
-* Length of your MCMC (i.e. the total number of “updates”), the number of chains, burnin, effective sample size, and any graphs/statistics/rationale you used to justify those settings
-* Also describe any changes in the distribution of the mean (shape, location, tails) compared to Task 1.
-  
 
+```
+The reason I chose a chi square distribution was because of how I thought the distribution of trees would be.  I suspected the majority of trees would be the smallest, since more younglins should sprout compared to the number of trees that have lived long enough to grow.  As time goes on some trees will die, leaving an increasingly smaller number of large trees to measure. This should then make a distribituion graph look very similar to the chi square. 
+```
+
+* Also describe any changes in the distribution of the mean (shape, location, tails) compared to Task 1.
+
+```{r}
+inits <- list()
+inits[[1]] <- list(mu = 7)
+inits[[2]] <- list(mu = 15)
+inits[[3]] <- list(mu = 21)
+
+summary(MY.out)
+```
+
+```{r}
+MY.model   <- jags.model (file = textConnection(NormalMeanN),
+                             data = data,
+                             inits = inits,
+                             n.chains = 3)
+```
+
+```{r}
+MY.out   <- coda.samples (model = MY.model,
+                            variable.names = c("mu"),
+                                n.iter = 1000) 
+
+```
+
+```{r}
+burnin <- GBR$last.iter[tail(which(GBR$shrink[,,2] > 1.1),1)+1]
+
+if(length(burnin) == 0) burnin = 1
+
+jags.burn <- window(jags.out,start=burnin)
+
+                              
+```
+
+* Graph of parameter density
+```{r}
+plot(MY.out)
+```
+
+* Plot of MCMC “history”
+```{r}
+BBR <- gelman.plot(MY.out)
+```
+
+* Length of your MCMC (i.e. the total number of “updates”), the number of chains, the burnin values you used, the effective sample size, and any graphs/statistics/rationale you used to justify those settings
+```{r}
+effectiveSize(jags.burn)
+burnin 
+# MCM length = 1000
+# Chains = 3
+```
+
+------------------------
+I completed the lab with Erin, on March 1st.  She explained why I was making the changes to the code in each example.  She told me from the assignemnt itself which graphs were of which information but did not allow me to copy the exact code, under your specefic instruction.  
+------------------------
 
