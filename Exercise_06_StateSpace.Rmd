@@ -130,11 +130,6 @@ y1[w]=NA
 y1[x]=NA
 y1
 
-monthly.time = time
-monthly.time[w]=NA
-monthly.time[x]=NA
-monthly.time
-
 RandomWalk1 = "
 model{
   
@@ -160,27 +155,23 @@ j.model.1   <- jags.model (file = textConnection(RandomWalk1),
                              data = data1,
                              inits = init,
                              n.chains = 3)
-
+                                
 jags.out.1   <- coda.samples (model = j.model.1,
-                            variable.names = c("tau_add","tau_obs"),
+                            variable.names = c("x","tau_add","tau_obs"),
                                 n.iter = 10000)
 
 out.1 <- as.matrix(jags.out.1)
-```
-
-```
-Prevents it from knitting
 
 ci.1 <- apply(exp(out.1[,3:ncol(out.1)]),2,quantile,c(0.025,0.5,0.975))
 ```
 
 ```{r}
-plot(monthly.time,ci[2,],type='n',ylim=range(y1,na.rm=TRUE),ylab="Flu Index",log='y',xlim=range(monthly.time, na.rm=TRUE), xlab="Time") 
+plot(time,ci.1[2,],type='n',ylim=range(y1,na.rm=TRUE),ylab="Flu Index",log='y',xlim=range(time, na.rm=TRUE), xlab="Time") 
 if(diff(time.rng) < 100){ 
-  axis.Date(1, at=seq(monthly.time[time.rng[1]],monthly.time[time.rng[2]],by='month'), format = "%Y-%m")
+  axis.Date(1, at=seq(time[time.rng[1]],time[time.rng[2]],by='month'), format = "%Y-%m")
 }
-ciEnvelope(monthly.time,ci[1,],ci[3,],col="green")
-points(monthly.time,y1,pch="*",cex=0.5)
+ciEnvelope(time,ci.1[1,],ci.1[3,],col="green")
+points(time,y1,pch="*",cex=0.5)
 ```
 
 * Compare the CI between the two runs.
@@ -191,7 +182,7 @@ Because of the lack of data, that we created, the CI is much larger in compariso
 
 * Generate a predicted (median) vs observed plot for the data points that were removed
 ```{r}
-
+plot(y, ci.25)
 ```
 
 * Comment on the accuracy and precision of the estimates.
@@ -209,7 +200,7 @@ ________________________________________________________________________________
 Return to the original data and instead of removing 3/4 of the data remove the last 40 observations (convert to NA) and refit the model to make a forecast for this period
 ```{r}
 z1 = 1:620
-w1 = seq(580, 620, by=1)
+w1 = seq(581, 620, by=1)
 z1[w1]=NA
 z1
 
@@ -217,7 +208,6 @@ y2 = y
 y2[w1]=NA
 y2
 
-extra.credit = time[z1]
 
 ```
 
@@ -249,31 +239,30 @@ j.model.2   <- jags.model (file = textConnection(RandomWalk.extracredit),
                              n.chains = 3)
 
 jags.out.2   <- coda.samples (model = j.model.2,
-                            variable.names = c("tau_add","tau_obs"),
+                            variable.names = c("x","tau_add","tau_obs"),
                                 n.iter = 10000)
 
 out.2 <- as.matrix(jags.out.2)
-```
 
-```
 ci.2 <- apply(exp(out.2[,3:ncol(out.2)]),2,quantile,c(0.025,0.5,0.975))
+ci.25 = apply(exp(out.2[,3:ncol(out.2)]),2,quantile,c(0.5))
 ```
 
 ```{r}
-plot(extra.credit,ci[2,],type='n',ylim=range(y2,na.rm=TRUE),ylab="Flu Index",log='y',xlim=range(extra.credit, na.rm=TRUE), xlab="Time") 
+plot(time,ci.2[2,],type='n',ylim=range(y2,na.rm=TRUE),ylab="Flu Index",log='y',xlim=range(time, na.rm=TRUE), xlab="Time") 
 
 if(diff(time.rng) < 100){ 
-  axis.Date(1, at=seq(extra.credit[time.rng[1]],extra.credit[time.rng[2]],by='month'), format = "%Y-%m")
+  axis.Date(1, at=seq(time[time.rng[1]],time[time.rng[2]],by='month'), format = "%Y-%m")
 }
-ciEnvelope(extra.credit,ci[1,],ci[3,],col="purple")
-points(extra.credit,y2,pch="~",cex=0.5)
+ciEnvelope(time,ci.2[1,],ci.2[3,],col="purple")
+points(time,y2,pch="~",cex=0.5)
 ```
 
 * Generate a time-series plot for the CI of x that includes the observations (as above but zoom the plot on the last ~80 observations). 
   Use a different color and symbol to differentiate observations that were included in the model versus       those that were converted to NA's.
 ```{r}
 z2 = 1:620
-w2 = seq(540, 620, by=1)
+w2 = seq(541, 620, by=1)
 z2[w2]=NA
 z2
 
@@ -281,7 +270,6 @@ y3=y
 y3[w2]=NA
 y3
 
-extra.credit.2 = time[z2]
 
 ```
 
@@ -313,23 +301,21 @@ j.model.3   <- jags.model (file = textConnection(RandomWalk.extracredit.3),
                              n.chains = 3)
 
 jags.out.3   <- coda.samples (model = j.model.3,
-                            variable.names = c("tau_add","tau_obs"),
+                            variable.names = c("x","tau_add","tau_obs"),
                                 n.iter = 10000)
 
 out.3 <- as.matrix(jags.out.3)
-```
 
-```
 ci.3 <- apply(exp(out.3[,3:ncol(out.3)]),2,quantile,c(0.025,0.5,0.975))
 ```
 
 ```{r}
-plot(extra.credit.2,ci[2,],type='n',ylim=range(y3,na.rm=TRUE),ylab="Flu Index",log='y',xlim=range(extra.credit.2, na.rm=TRUE), xlab="Time") 
+plot(time,ci.3[2,],type='n',ylim=range(y3,na.rm=TRUE),ylab="Flu Index",log='y',xlim=range(time, na.rm=TRUE), xlab="Time") 
 if(diff(time.rng) < 100){ 
-  axis.Date(1, at=seq(extra.credit.2[time.rng[1]],extra.credit.2[time.rng[2]],by='month'), format = "%Y-%m")
+  axis.Date(1, at=seq(time[time.rng[1]],time[time.rng[2]],by='month'), format = "%Y-%m")
 }
-ciEnvelope(extra.credit.2,ci[1,],ci[3,],col="red")
-points(extra.credit.2,y3,pch="!",cex=0.5)
+ciEnvelope(time,ci.3[1,],ci.3[3,],col="red")
+points(time,y3,pch="^",cex=0.5)
 ```
 
 * Comment on how well the random walk model performed (both accuracy and precision) and how it might be modified to improve both these criteria.
@@ -340,7 +326,5 @@ points(extra.credit.2,y3,pch="!",cex=0.5)
 
 
 Ending Notes
-______________________________________________________________________________________________I worked with Erin Freeman on this lab.
-
-The reason why my confidence intervals do not work is because of their length.  The matrix out.1, out.2, and out.3 area all 60000 long when they need to be 18660000 long, as in the example run.  Even though Erin and I used the same methods of copying and editing the code, somehow mine does not have the desired length.  Once I figure out why the length is so much shorter, the individual CI's could be created and compared to one another.   
-______________________________________________________________________________________________
+________________________________________________________________________________I worked with Erin Freeman on this lab.
+________________________________________________________________________________
