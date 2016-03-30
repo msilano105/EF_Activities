@@ -81,6 +81,7 @@ Now that we have estimates for our parameters, let's write a function that evalu
 ##' @return list
 ##'  mu.f, mu.a  = state mean vector for (a)nalysis and (f)orecast steps
 ##'  P.f, P.a    = state covariance matrix for a and f
+
 KalmanFilter <- function(M,mu0,P0,Q,R,Y){
   
   ## storage
@@ -127,7 +128,11 @@ ciEnvelope <- function(x,ylo,yhi,...){
 }
 ```
 
-With the KF function defined, we need to define the inputs to the function and call the function. Note below that I'm using the variable KF00 to store the outputs, where I'm using 00 to indicate that this run was done with the defaults for both the process model and process error covariance. In the assignment below you will rerun this analysis under a number of alternatives varying the process error and the magnitude of spatial flux in the process model.
+With the KF function defined, we need to define the inputs to the function and call the function. 
+```
+Note below that I'm using the variable KF00 to store the outputs, where I'm using 00 to indicate that this run was done with the defaults for both the process model and process error covariance. 
+```
+In the assignment below you will rerun this analysis under a number of alternatives varying the process error and the magnitude of spatial flux in the process model.
 
 ```{r}
 ## log transform data
@@ -138,12 +143,12 @@ load("data/KFalpha.params.Rdata")
 
 ## options for process model 
 alpha = 0       ## assume no spatial flux
-#alpha = 0.05    ## assume a large spatial flux
+alpha.1 = 0.05    ## assume a large spatial flux
 M = adj*alpha + diag(1-alpha*apply(adj,1,sum))  ## random walk with flux
 
 ## options for process error covariance
 Q = tau_proc            ## full covariance matrix
-#Q = diag(diag(Q))       ## diagonal covariance matrix
+Q.1 = diag(diag(Q))       ## diagonal covariance matrix
 
 ## observation error covariance (assumed independent)  
 R = diag(tau_obs,nstates) 
@@ -183,12 +188,265 @@ for(i in 1:6){
 }
 ```
 
+_____________________________________________________________________________________________
 The assignment is to run the KF under all four combinations of covariance in the process model versus process error and compare the results. In particular you'll want to pay attention to the missing data at the beginning of the timeseries for some states. You'll also want to comment on how spatial adjacency affects the confidence in the inferences (some states are more isolated than others) in the four different scenarios. Finally, you'll want to note that the alpha estimated from the data itself (0.000209), is close to zero and thus our real forecast would be much more like our no-flux run than our high flux run.
 
 * Rerun with process error set to just the diagonal matrix of Q, compare the results with the original
 
+```{r}
+## options for process model 
+alpha = 0       ## assume no spatial flux
+alpha.1 = 0.05    ## assume a large spatial flux
+M = adj*alpha + diag(1-alpha*apply(adj,1,sum))  ## random walk with flux
+M.1 = adj*alpha.1 + diag(1-alpha.1*apply(adj,1,sum))  ## random walk with flux
+
+## options for process error covariance
+Q = tau_proc            ## full covariance matrix
+Q.1 = diag(diag(Q))       ## diagonal covariance matrix
+
+## Run Kalman Filter
+KF00 = KalmanFilter(M,mu0,P0,Q,R,Y)
+KF01 = KalmanFilter(M,mu0,P0,Q.1,R,Y)
+KF11 = KalmanFilter(M.1,mu0,P0,Q.1,R,Y)
+KF02 = KalmanFilter(M.1,mu0,P0,Q,R,Y)
+```
+
+```{r}
+KalmanFilter <- function(M,mu0,P0,Q.1,R,Y){
+  
+  ## storage
+  nstates = nrow(Y)  
+  nt = ncol(Y)
+  mu.f  = matrix(NA,nstates,nt+1)  ## forecast mean for time t
+  mu.a  = matrix(NA,nstates,nt)  ## analysis mean for time t
+  P.f  = array(NA,c(nstates,nstates,nt+1))  ## forecast variance for time t
+  P.a  = array(NA,c(nstates,nstates,nt))  ## analysis variance for time t
+
+  ## initialization
+  mu.f[,1] = mu0
+  P.f[,,1] = P0
+  I = diag(1,nstates)
+
+  ## run updates sequentially for each observation.
+  for(t in 1:nt){
+
+    ## Analysis step: combine previous forecast with observed data
+    obs = !is.na(Y[,t]) ## which Y's were observed?
+    if(any(obs)){
+      H <- I[obs,]                                                        ## observation matrix
+      K <- P.f[,,t] %*% t(H) %*% solve(H%*%P.f[,,t]%*%t(H) + R[obs,obs])  ## Kalman gain
+      mu.a[,t] <- mu.f[,t] + K%*%(Y[obs,t] - H %*% mu.f[,t])              ## update mean
+      P.a[,,t] <- (1-K %*% H)*P.f[,,t]                                    ## update covariance
+    } else {
+      ##if there's no data, the posterior is the prior
+      mu.a[,t] = mu.f[,t]
+      P.a[,,t] = P.f[,,t]
+    }
+
+    ## Forecast step: predict to next step from current
+    mu.f[,t+1] = M%*%mu.a[,t]
+    P.f[,,t+1] = Q.1 + M*P.a[,,t]*t(M)
+  
+  }
+  
+  return(list(mu.f=mu.f,mu.a=mu.a,P.f=P.f,P.a=P.a))
+}
+
+ciEnvelope <- function(x,ylo,yhi,...){
+  polygon(cbind(c(x, rev(x), x[1]), c(ylo, rev(yhi),
+                                      ylo[1])), border = NA,...) 
+}
+```
+
+```{r}
+attach(KF01)
+nt = length(time)
+
+### plot ANALYSIS mean & CI time-series
+par(mfrow=c(3,1))
+for(i in 1:6){
+  ci = rbind(mu.a[i,]-1.96*sqrt(P.a[i,i,]),mu.a[i,]+1.96*sqrt(P.a[i,i,]))
+  plot(time,mu.a[i,],ylim=range(ci,na.rm=TRUE),type='n',main=states[i])
+  ciEnvelope(time,ci[1,],ci[2,],col="lightBlue")
+  lines(time,mu.a[i,],col=4)
+  lines(time,Y[i,])
+}
+
+## plot ANALYSIS and FORECAST variance time-series
+par(mfrow=c(3,1))
+for(i in 1:6){
+  plot(time,sqrt(P.a[i,i,]),ylim=c(0,sqrt(max(c(P.a[i,i,],P.f[i,i,])))),main=states[i],xlab="Time",
+       ylab="Std Error",type='l')
+  lines(time,sqrt(P.f[i,i,1:nt]),col=2)
+  points(time[is.na(Y[i,])],rep(0,nt)[is.na(Y[i,])],pch="*",col=3) ## flag's the zero's
+  legend("topright",legend=c("Analysis","Forecast","NAs"),col=1:3,lty=c(1,1,NA),pch=c(NA,NA,1),cex=1.4)
+}
+```
+
+_____________________________________________________________________________________________
 * Rerun with alpha = 0.05 and the diagonal Q matrix
 
+```{r}
+KalmanFilter <- function(M.1,mu0,P0,Q.1,R,Y){
+  
+  ## storage
+  nstates = nrow(Y)  
+  nt = ncol(Y)
+  mu.f  = matrix(NA,nstates,nt+1)  ## forecast mean for time t
+  mu.a  = matrix(NA,nstates,nt)  ## analysis mean for time t
+  P.f  = array(NA,c(nstates,nstates,nt+1))  ## forecast variance for time t
+  P.a  = array(NA,c(nstates,nstates,nt))  ## analysis variance for time t
+
+  ## initialization
+  mu.f[,1] = mu0
+  P.f[,,1] = P0
+  I = diag(1,nstates)
+
+  ## run updates sequentially for each observation.
+  for(t in 1:nt){
+
+    ## Analysis step: combine previous forecast with observed data
+    obs = !is.na(Y[,t]) ## which Y's were observed?
+    if(any(obs)){
+      H <- I[obs,]                                                        ## observation matrix
+      K <- P.f[,,t] %*% t(H) %*% solve(H%*%P.f[,,t]%*%t(H) + R[obs,obs])  ## Kalman gain
+      mu.a[,t] <- mu.f[,t] + K%*%(Y[obs,t] - H %*% mu.f[,t])              ## update mean
+      P.a[,,t] <- (1-K %*% H)*P.f[,,t]                                    ## update covariance
+    } else {
+      ##if there's no data, the posterior is the prior
+      mu.a[,t] = mu.f[,t]
+      P.a[,,t] = P.f[,,t]
+    }
+
+    ## Forecast step: predict to next step from current
+    mu.f[,t+1] = M.1%*%mu.a[,t]
+    P.f[,,t+1] = Q.1 + M.1*P.a[,,t]*t(M.1)
+  
+  }
+  
+  return(list(mu.f=mu.f,mu.a=mu.a,P.f=P.f,P.a=P.a))
+}
+
+ciEnvelope <- function(x,ylo,yhi,...){
+  polygon(cbind(c(x, rev(x), x[1]), c(ylo, rev(yhi),
+                                      ylo[1])), border = NA,...) 
+}
+```
+
+```{r}
+## Run Kalman Filter
+KF11 = KalmanFilter(M.1,mu0,P0,Q.1,R,Y)
+```
+
+```{r}
+attach(KF11)
+nt = length(time)
+
+### plot ANALYSIS mean & CI time-series
+par(mfrow=c(3,1))
+for(i in 1:6){
+  ci = rbind(mu.a[i,]-1.96*sqrt(P.a[i,i,]),mu.a[i,]+1.96*sqrt(P.a[i,i,]))
+  plot(time,mu.a[i,],ylim=range(ci,na.rm=TRUE),type='n',main=states[i])
+  ciEnvelope(time,ci[1,],ci[2,],col="lightBlue")
+  lines(time,mu.a[i,],col=4)
+  lines(time,Y[i,])
+}
+
+## plot ANALYSIS and FORECAST variance time-series
+par(mfrow=c(3,1))
+for(i in 1:6){
+  plot(time,sqrt(P.a[i,i,]),ylim=c(0,sqrt(max(c(P.a[i,i,],P.f[i,i,])))),main=states[i],xlab="Time",
+       ylab="Std Error",type='l')
+  lines(time,sqrt(P.f[i,i,1:nt]),col=2)
+  points(time[is.na(Y[i,])],rep(0,nt)[is.na(Y[i,])],pch="*",col=3) ## flag's the zero's
+  legend("topright",legend=c("Analysis","Forecast","NAs"),col=1:3,lty=c(1,1,NA),pch=c(NA,NA,1),cex=1.4)
+}
+```
+
+_____________________________________________________________________________________________
 * Rerun with alpha = 0.05 and the original Q matrix
 
+```{r}
+KalmanFilter <- function(M.1,mu0,P0,Q,R,Y){
+  
+  ## storage
+  nstates = nrow(Y)  
+  nt = ncol(Y)
+  mu.f  = matrix(NA,nstates,nt+1)  ## forecast mean for time t
+  mu.a  = matrix(NA,nstates,nt)  ## analysis mean for time t
+  P.f  = array(NA,c(nstates,nstates,nt+1))  ## forecast variance for time t
+  P.a  = array(NA,c(nstates,nstates,nt))  ## analysis variance for time t
+
+  ## initialization
+  mu.f[,1] = mu0
+  P.f[,,1] = P0
+  I = diag(1,nstates)
+
+  ## run updates sequentially for each observation.
+  for(t in 1:nt){
+
+    ## Analysis step: combine previous forecast with observed data
+    obs = !is.na(Y[,t]) ## which Y's were observed?
+    if(any(obs)){
+      H <- I[obs,]                                                        ## observation matrix
+      K <- P.f[,,t] %*% t(H) %*% solve(H%*%P.f[,,t]%*%t(H) + R[obs,obs])  ## Kalman gain
+      mu.a[,t] <- mu.f[,t] + K%*%(Y[obs,t] - H %*% mu.f[,t])              ## update mean
+      P.a[,,t] <- (1-K %*% H)*P.f[,,t]                                    ## update covariance
+    } else {
+      ##if there's no data, the posterior is the prior
+      mu.a[,t] = mu.f[,t]
+      P.a[,,t] = P.f[,,t]
+    }
+
+    ## Forecast step: predict to next step from current
+    mu.f[,t+1] = M.1%*%mu.a[,t]
+    P.f[,,t+1] = Q + M.1*P.a[,,t]*t(M.1)
+  
+  }
+  
+  return(list(mu.f=mu.f,mu.a=mu.a,P.f=P.f,P.a=P.a))
+}
+
+ciEnvelope <- function(x,ylo,yhi,...){
+  polygon(cbind(c(x, rev(x), x[1]), c(ylo, rev(yhi),
+                                      ylo[1])), border = NA,...) 
+}
+```
+
+```{r}
+## Run Kalman Filter
+KF02 = KalmanFilter(M.1,mu0,P0,Q,R,Y)
+```
+
+```{r}
+attach(KF02)
+nt = length(time)
+
+### plot ANALYSIS mean & CI time-series
+par(mfrow=c(3,1))
+for(i in 1:6){
+  ci = rbind(mu.a[i,]-1.96*sqrt(P.a[i,i,]),mu.a[i,]+1.96*sqrt(P.a[i,i,]))
+  plot(time,mu.a[i,],ylim=range(ci,na.rm=TRUE),type='n',main=states[i])
+  ciEnvelope(time,ci[1,],ci[2,],col="lightBlue")
+  lines(time,mu.a[i,],col=4)
+  lines(time,Y[i,])
+}
+
+## plot ANALYSIS and FORECAST variance time-series
+par(mfrow=c(3,1))
+for(i in 1:6){
+  plot(time,sqrt(P.a[i,i,]),ylim=c(0,sqrt(max(c(P.a[i,i,],P.f[i,i,])))),main=states[i],xlab="Time",
+       ylab="Std Error",type='l')
+  lines(time,sqrt(P.f[i,i,1:nt]),col=2)
+  points(time[is.na(Y[i,])],rep(0,nt)[is.na(Y[i,])],pch="*",col=3) ## flag's the zero's
+  legend("topright",legend=c("Analysis","Forecast","NAs"),col=1:3,lty=c(1,1,NA),pch=c(NA,NA,1),cex=1.4)
+}
+```
+
 * Explain conceptually what would have to change in the Kalman Filter function if we replaced the current linear model with a nonlinear process model, in order to turn it into an Extended Kalman Filter function.
+
+```
+By changing the process error to the diagnol and the non given we lose precision with our confidence intrevals.  When adding in the process model error, the confidence intrevals decrease.  When both were changed our added to the kalman filter, the models forecast became better.
+
+The analysis and forecasting steps within the function would need to be changed, as to allow for a non-linear set of equations.
+```
