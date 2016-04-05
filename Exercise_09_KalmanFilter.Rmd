@@ -446,7 +446,9 @@ for(i in 1:6){
 * Explain conceptually what would have to change in the Kalman Filter function if we replaced the current linear model with a nonlinear process model, in order to turn it into an Extended Kalman Filter function.
 
 ```
-By changing the process error to the diagnol and the non given we lose precision with our confidence intrevals.  When adding in the process model error, the confidence intrevals decrease.  When both were changed our added to the kalman filter, the models forecast became better.
+Extended kalman filter includes non-linear equations and uses talyor series to calculate.
+
+By changing the process error to the diagnol and the non given we lose precision with our confidence intrevals.  When adding in the process model error, the confidence intrevals decrease.  When both were changed or added to the kalman filter, the models forecast became more precisein its CI.
 
 The analysis and forecasting steps within the function would need to be changed, as to allow for a non-linear set of equations. 
 ```
