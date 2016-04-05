@@ -448,5 +448,5 @@ for(i in 1:6){
 ```
 By changing the process error to the diagnol and the non given we lose precision with our confidence intrevals.  When adding in the process model error, the confidence intrevals decrease.  When both were changed our added to the kalman filter, the models forecast became better.
 
-The analysis and forecasting steps within the function would need to be changed, as to allow for a non-linear set of equations.
+The analysis and forecasting steps within the function would need to be changed, as to allow for a non-linear set of equations. 
 ```
